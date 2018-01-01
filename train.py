@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     for iteration in range(start_iteration, args.num_iterations):
 
-        cross_entropy, kld, coef = train_step(iteration, args.batch_size, args.use_cuda, args.dropout)
+        cross_entropy, kld, coef, train_data_sample = train_step(iteration, args.batch_size, args.use_cuda, args.dropout)
 
         if iteration % 5 == 0:
             print('\n')
@@ -104,11 +104,15 @@ if __name__ == "__main__":
             kld_result += [kld]
 
         if iteration % 20 == 0:
+            train_data_sample = np.flip(train_data_sample.data.numpy(), 0)
+            train_data_sample_sentence = batch_loader.decode_words(train_data_sample)
+
             seed = np.random.normal(size=[1, parameters.latent_variable_size])
 
             sample, sample_ce, _ = rvae.sample(batch_loader, 50, seed, args.use_cuda)
             sample2, sample2_ce, sample2_len = rvae.sample2(batch_loader, 50, args.use_cuda, 'please play the jazz music')
             sample3, sample3_ce, sample3_len = rvae.sample2(batch_loader, 50, args.use_cuda, 'i really want to hear some jazz can you play some')
+            sample4, sample4_ce, sample4_len = rvae.sample2(batch_loader, 50, args.use_cuda, train_data_sample_sentence)
 
             print('\n')
             print('------------SAMPLE------------')
@@ -116,6 +120,11 @@ if __name__ == "__main__":
             print(sample, sample_ce)
             print(sample2, '-', sample2_ce, ',', sample2_len)
             print(sample3, '-', sample3_ce, ',', sample3_len)
+            print('------------TRAIN DATA SAMPLE------------')
+            print('>>>> INPUT')
+            print(train_data_sample_sentence)
+            print('>>>> OUTPUT')
+            print(sample4, '-', sample4_ce, ',', sample4_len)
             print('------------------------------')
 
         if iteration % 300 == 0:

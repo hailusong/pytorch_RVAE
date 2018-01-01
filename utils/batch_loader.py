@@ -334,3 +334,7 @@ class BatchLoader:
     def decode_characters(self, characters_idx):
         characters = [self.idx_to_char[i] for i in characters_idx]
         return ''.join(characters)
+
+    def decode_words(self, words_idx):
+        words = [self.decode_word(w_i) for w_i in words_idx]
+        return ' '.join(words)

@@ -113,7 +113,7 @@ class RVAE(nn.Module):
             loss.backward()
             optimizer.step()
 
-            return cross_entropy, kld, kld_coef(i)
+            return cross_entropy, kld, kld_coef(i), encoder_word_input[0]
 
         return train
 
