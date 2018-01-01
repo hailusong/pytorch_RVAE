@@ -1,9 +1,12 @@
 import argparse
 import os
+import os.path
 
 import numpy as np
 import torch as t
 from torch.optim import Adam
+
+import pickle
 
 from utils.batch_loader import BatchLoader
 from utils.parameters import Parameters
@@ -41,7 +44,7 @@ if __name__ == "__main__":
                             batch_loader.chars_vocab_size)
 
     rvae = RVAE(parameters)
-    if args.use_trained:
+    if args.use_trained and os.path.exists('trained_RVAE'):
         rvae.load_state_dict(t.load('trained_RVAE'))
     if args.use_cuda:
         rvae = rvae.cuda()
@@ -53,8 +56,20 @@ if __name__ == "__main__":
 
     ce_result = []
     kld_result = []
+    start_iteration = 0
 
-    for iteration in range(args.num_iterations):
+    if args.use_trained and os.path.exists('breakpoint.pkl'):
+        print('Restoring from snapshot.pkl ...')
+
+        # Getting back the objects:
+        with open('breakpoint.pkl', 'rb') as f:
+            ce_result, kld_result, start_iteration = pickle.load(f)
+
+        start_iteration += 1
+
+    print('Iteration starts at', start_iteration)
+
+    for iteration in range(start_iteration, args.num_iterations):
 
         cross_entropy, kld, coef = train_step(iteration, args.batch_size, args.use_cuda, args.dropout)
 
@@ -91,15 +106,34 @@ if __name__ == "__main__":
         if iteration % 20 == 0:
             seed = np.random.normal(size=[1, parameters.latent_variable_size])
 
-            sample = rvae.sample(batch_loader, 50, seed, args.use_cuda)
+            sample, sample_ce, _ = rvae.sample(batch_loader, 50, seed, args.use_cuda)
+            sample2, sample2_ce, sample2_len = rvae.sample2(batch_loader, 50, args.use_cuda, 'please play the jazz music')
+            sample3, sample3_ce, sample3_len = rvae.sample2(batch_loader, 50, args.use_cuda, 'i really want to hear some jazz can you play some')
 
             print('\n')
             print('------------SAMPLE------------')
             print('------------------------------')
-            print(sample)
+            print(sample, sample_ce)
+            print(sample2, '-', sample2_ce, ',', sample2_len)
+            print(sample3, '-', sample3_ce, ',', sample3_len)
             print('------------------------------')
 
+        if iteration % 300 == 0:
+            print('Saving model data and iteration as', iteration)
+            t.save(rvae.state_dict(), 'trained_RVAE.temp')
+            # obj0, obj1, obj2 are created here...
+
+            # Saving the objects:
+            with open('breakpoint.pkl.temp', 'wb') as f:
+                pickle.dump([ce_result, kld_result, iteration], f)
+
+            os.rename('trained_RVAE.temp', 'trained_RVAE')
+            os.rename('breakpoint.pkl.temp', 'breakpoint.pkl')
+
     t.save(rvae.state_dict(), 'trained_RVAE')
+    print('Removing breakpoint.pkl ...')
+    os.remove('trained_RVAE')
+    os.remove('snapshot.pkl')
 
     np.save('ce_result_{}.npy'.format(args.ce_result), np.array(ce_result))
     np.save('kld_result_npy_{}'.format(args.kld_result), np.array(kld_result))

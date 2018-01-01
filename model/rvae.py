@@ -8,9 +8,9 @@ from .decoder import Decoder
 from .encoder import Encoder
 
 from selfModules.embedding import Embedding
-
 from utils.functional import kld_coef, parameters_allocation_check, fold
 
+import matplotlib.pyplot as plt
 
 class RVAE(nn.Module):
     def __init__(self, params):
@@ -46,15 +46,15 @@ class RVAE(nn.Module):
                  final rnn state with shape of [num_layers, batch_size, decoder_rnn_size]
         """
 
-        assert parameters_allocation_check(self), \
-            'Invalid CUDA options. Parameters should be allocated in the same memory'
+        # assert parameters_allocation_check(self), \
+        #     'Invalid CUDA options. Parameters should be allocated in the same memory'
         use_cuda = self.embedding.word_embed.weight.is_cuda
 
-        assert z is None and fold(lambda acc, parameter: acc and parameter is not None,
-                                  [encoder_word_input, encoder_character_input, decoder_word_input],
-                                  True) \
-            or (z is not None and decoder_word_input is not None), \
-            "Invalid input. If z is None then encoder and decoder inputs should be passed as arguments"
+        # assert z is None and fold(lambda acc, parameter: acc and parameter is not None,
+        #                           [encoder_word_input, encoder_character_input, decoder_word_input],
+        #                           True) \
+        #     or (z is not None and decoder_word_input is not None), \
+        #     "Invalid input. If z is None then encoder and decoder inputs should be passed as arguments"
 
         if z is None:
             ''' Get context from encoder and sample z ~ N(mu, std)
@@ -140,8 +140,9 @@ class RVAE(nn.Module):
 
         return validate
 
-    def sample(self, batch_loader, seq_len, seed, use_cuda):
-        seed = Variable(t.from_numpy(seed).float())
+    def sample(self, batch_loader, seq_len, seed, use_cuda, target_word_tensor=None, use_max=False):
+        if type(seed) is not t.autograd.variable.Variable:
+            seed = Variable(t.from_numpy(seed).float())
         if use_cuda:
             seed = seed.cuda()
 
@@ -156,6 +157,8 @@ class RVAE(nn.Module):
         result = ''
 
         initial_state = None
+        cross_entropy = 0
+        effective_len = 0
 
         for i in range(seq_len):
             logits, initial_state, _ = self(0., None, None,
@@ -165,12 +168,25 @@ class RVAE(nn.Module):
             logits = logits.view(-1, self.params.word_vocab_size)
             prediction = F.softmax(logits)
 
-            word = batch_loader.sample_word_from_distribution(prediction.data.cpu().numpy()[-1])
+            if use_max:
+                word = batch_loader.sample_word(prediction.data.cpu().numpy()[-1])
+            else:
+                word = batch_loader.sample_word_from_distribution(prediction.data.cpu().numpy()[-1])
 
             if word == batch_loader.end_token:
                 break
 
             result += ' ' + word
+
+            if target_word_tensor is not None:
+                if i < target_word_tensor.size(1):
+                    cross_entropy += F.cross_entropy(logits, target_word_tensor[0, i])
+                else:
+                    pad_tensor = [batch_loader.word_to_idx[batch_loader.pad_token]]
+                    pad_tensor = Variable(t.from_numpy(np.array(pad_tensor)))
+                    cross_entropy += F.cross_entropy(logits, pad_tensor)
+
+            effective_len += 1
 
             decoder_word_input_np = np.array([[batch_loader.word_to_idx[word]]])
             decoder_character_input_np = np.array([[batch_loader.encode_characters(word)]])
@@ -181,4 +197,55 @@ class RVAE(nn.Module):
             if use_cuda:
                 decoder_word_input, decoder_character_input = decoder_word_input.cuda(), decoder_character_input.cuda()
 
-        return result
+        if target_word_tensor is not None and effective_len != 0:
+            avg_cross_entropy = cross_entropy / effective_len
+            avg_cross_entropy = avg_cross_entropy.data.numpy()
+        else:
+            avg_cross_entropy = None
+
+        return result, avg_cross_entropy, effective_len
+
+    def sample2(self, batch_loader, seq_len, use_cuda, source_sentence):
+
+        sample2_word_tensor = [np.array(list(map(batch_loader.word_to_idx.get, source_sentence.split())))]
+        sample2_character_tensor = [np.array(list(map(batch_loader.encode_characters, source_sentence.split())))]
+
+        # first sentence
+        input = [np.array(sample2_word_tensor), np.array(sample2_character_tensor)]
+        input = [Variable(t.from_numpy(var)) for var in input]
+        input = [var.long() for var in input]
+        input = [var.cuda() if use_cuda else var for var in input]
+
+        sample2_word_tensor, sample2_character_tensor = input
+        encoder_input = self.embedding(sample2_word_tensor, sample2_character_tensor)
+
+        context = self.encoder(encoder_input)
+
+        mu = self.context_to_mu(context)
+        logvar = self.context_to_logvar(context)
+        std = t.exp(0.5 * logvar)
+
+        z = Variable(t.randn([1, self.params.latent_variable_size]))
+
+        # f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+        # f.suptitle('seed vs z')
+        #
+        # count, bins, _ = plt.hist(z.data.numpy().squeeze(), 30)
+        # ax1.plot(bins)
+        # ax1.set_title('z')
+
+        if use_cuda:
+            z = z.cuda()
+
+        seed = z * std + mu
+
+        # count, bins, _ = plt.hist(seed.data.numpy().squeeze(), 30)
+        # ax2.plot(bins)
+        # ax2.set_title('seed')
+        #
+        # plt.show()
+
+        if use_cuda:
+            seed = seed.cuda()
+
+        return self.sample(batch_loader, seq_len, seed, use_cuda, sample2_word_tensor)

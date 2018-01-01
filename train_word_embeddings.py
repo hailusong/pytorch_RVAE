@@ -1,5 +1,5 @@
 import argparse
-
+import sys
 import numpy as np
 import torch as t
 from torch.autograd import Variable
@@ -21,6 +21,8 @@ if __name__ == '__main__':
     parser.add_argument('--use-cuda', type=bool, default=True, metavar='CUDA',
                         help='use cuda (default: True)')
     args = parser.parse_args()
+
+    print(">>>", args.use_cuda, ">>>", args.num_sample)
 
     batch_loader = BatchLoader('')
     params = Parameters(batch_loader.max_word_len,

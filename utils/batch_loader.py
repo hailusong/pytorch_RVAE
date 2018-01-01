@@ -311,6 +311,16 @@ class BatchLoader:
 
     def sample_word_from_distribution(self, distribution):
         ix = np.random.choice(range(self.words_vocab_size), p=distribution.ravel())
+        # print("Select normal distribution", ix)
+
+        x = np.zeros((self.words_vocab_size, 1))
+        x[ix] = 1
+        return self.idx_to_word[np.argmax(x)]
+
+    def sample_word(self, distribution):
+        ix = np.argmax(distribution.ravel())
+        # print("Select MAX PROBABILITY", ix)
+
         x = np.zeros((self.words_vocab_size, 1))
         x[ix] = 1
         return self.idx_to_word[np.argmax(x)]
