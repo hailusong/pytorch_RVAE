@@ -113,7 +113,7 @@ class RVAE(nn.Module):
             loss.backward()
             optimizer.step()
 
-            return cross_entropy, kld, kld_coef(i), encoder_word_input[0]
+            return cross_entropy, kld, kld_coef(i), encoder_word_input[:1], encoder_character_input[:1]
 
         return train
 
@@ -207,8 +207,18 @@ class RVAE(nn.Module):
 
     def sample2(self, batch_loader, seq_len, use_cuda, source_sentence):
 
-        sample2_word_tensor = [np.array(list(map(batch_loader.word_to_idx.get, source_sentence.split())))]
-        sample2_character_tensor = [np.array(list(map(batch_loader.encode_characters, source_sentence.split())))]
+        sample2_word_tensor = np.array(list(map(batch_loader.word_to_idx.get, source_sentence.split())))
+        sample2_character_tensor = np.array(list(map(batch_loader.encode_characters, source_sentence.split())))
+
+        sample2_word_tensor = np.flip(sample2_word_tensor, 0)
+        sample2_character_tensor = np.flip(sample2_character_tensor, 1)
+
+        to_add = seq_len - len(sample2_word_tensor)
+        to_add_words = np.array([batch_loader.word_to_idx[batch_loader.pad_token]] * to_add)
+        to_add_chars = np.array([batch_loader.encode_characters(batch_loader.pad_token)] * to_add)
+
+        sample2_word_tensor = [np.concatenate((to_add_words, sample2_word_tensor))]
+        sample2_character_tensor = [np.concatenate((to_add_chars, sample2_character_tensor), 0)]
 
         # first sentence
         input = [np.array(sample2_word_tensor), np.array(sample2_character_tensor)]
@@ -217,6 +227,43 @@ class RVAE(nn.Module):
         input = [var.cuda() if use_cuda else var for var in input]
 
         sample2_word_tensor, sample2_character_tensor = input
+        encoder_input = self.embedding(sample2_word_tensor, sample2_character_tensor)
+
+        context = self.encoder(encoder_input)
+
+        mu = self.context_to_mu(context)
+        logvar = self.context_to_logvar(context)
+        std = t.exp(0.5 * logvar)
+
+        z = Variable(t.randn([1, self.params.latent_variable_size]))
+
+        # f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+        # f.suptitle('seed vs z')
+        #
+        # count, bins, _ = plt.hist(z.data.numpy().squeeze(), 30)
+        # ax1.plot(bins)
+        # ax1.set_title('z')
+
+        if use_cuda:
+            z = z.cuda()
+
+        seed = z * std + mu
+
+        # count, bins, _ = plt.hist(seed.data.numpy().squeeze(), 30)
+        # ax2.plot(bins)
+        # ax2.set_title('seed')
+        #
+        # plt.show()
+
+        if use_cuda:
+            seed = seed.cuda()
+
+        return self.sample(batch_loader, seq_len, seed, use_cuda, sample2_word_tensor)
+
+    def sample3(self, batch_loader, seq_len, use_cuda, train_word_sample, train_chars_sample):
+
+        sample2_word_tensor = train_word_sample
+        sample2_character_tensor = train_chars_sample
         encoder_input = self.embedding(sample2_word_tensor, sample2_character_tensor)
 
         context = self.encoder(encoder_input)
