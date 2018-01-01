@@ -97,6 +97,7 @@ class RVAE(nn.Module):
             input = [var.cuda() if use_cuda else var for var in input]
 
             [encoder_word_input, encoder_character_input, decoder_word_input, decoder_character_input, target] = input
+            target_original = target.clone()
 
             logits, _, kld = self(dropout,
                                   encoder_word_input, encoder_character_input,
@@ -113,7 +114,7 @@ class RVAE(nn.Module):
             loss.backward()
             optimizer.step()
 
-            return cross_entropy, kld, kld_coef(i), encoder_word_input[:1], encoder_character_input[:1]
+            return cross_entropy, kld, kld_coef(i), encoder_word_input[:1], encoder_character_input[:1], target_original[:1]
 
         return train
 
@@ -140,7 +141,7 @@ class RVAE(nn.Module):
 
         return validate
 
-    def sample(self, batch_loader, seq_len, seed, use_cuda, target_word_tensor=None, use_max=False):
+    def sample(self, batch_loader, seq_len, seed, use_cuda, target_word_tensor=None, use_max=False, train_target=None):
         if type(seed) is not t.autograd.variable.Variable:
             seed = Variable(t.from_numpy(seed).float())
         if use_cuda:
@@ -157,15 +158,20 @@ class RVAE(nn.Module):
         result = ''
 
         initial_state = None
+        logits_all = None
         cross_entropy = 0
         effective_len = 0
+        found_end = False
+        total_iteration_steps = seq_len if train_target is None else train_target.size()[1]
 
-        for i in range(seq_len):
+        for i in range(total_iteration_steps):
             logits, initial_state, _ = self(0., None, None,
                                             decoder_word_input, decoder_character_input,
                                             seed, initial_state)
 
             logits = logits.view(-1, self.params.word_vocab_size)
+            logits_all = t.cat((logits_all, logits), 0) if logits_all is not None else logits
+
             prediction = F.softmax(logits)
 
             if use_max:
@@ -174,19 +180,14 @@ class RVAE(nn.Module):
                 word = batch_loader.sample_word_from_distribution(prediction.data.cpu().numpy()[-1])
 
             if word == batch_loader.end_token:
+                found_end = True
+
+            if train_target is None and found_end:
                 break
 
-            result += ' ' + word
-
-            if target_word_tensor is not None:
-                if i < target_word_tensor.size(1):
-                    cross_entropy += F.cross_entropy(logits, target_word_tensor[0, i])
-                else:
-                    pad_tensor = [batch_loader.word_to_idx[batch_loader.pad_token]]
-                    pad_tensor = Variable(t.from_numpy(np.array(pad_tensor)))
-                    cross_entropy += F.cross_entropy(logits, pad_tensor)
-
-            effective_len += 1
+            if not found_end:
+                result += ' ' + word
+                effective_len += 1
 
             decoder_word_input_np = np.array([[batch_loader.word_to_idx[word]]])
             decoder_character_input_np = np.array([[batch_loader.encode_characters(word)]])
@@ -197,13 +198,12 @@ class RVAE(nn.Module):
             if use_cuda:
                 decoder_word_input, decoder_character_input = decoder_word_input.cuda(), decoder_character_input.cuda()
 
-        if target_word_tensor is not None and effective_len != 0:
-            avg_cross_entropy = cross_entropy / effective_len
-            avg_cross_entropy = avg_cross_entropy.data.numpy()
-        else:
-            avg_cross_entropy = None
+        if train_target is not None:
+            print("***********", seq_len, total_iteration_steps, logits_all.size(), train_target.size())
+            cross_entropy = F.cross_entropy(logits_all, train_target[0])
+            cross_entropy = cross_entropy.data.numpy()[0]
 
-        return result, avg_cross_entropy, effective_len
+        return result, cross_entropy, effective_len
 
     def sample2(self, batch_loader, seq_len, use_cuda, source_sentence):
 
@@ -260,7 +260,7 @@ class RVAE(nn.Module):
 
         return self.sample(batch_loader, seq_len, seed, use_cuda, sample2_word_tensor)
 
-    def sample3(self, batch_loader, seq_len, use_cuda, train_word_sample, train_chars_sample):
+    def sample3(self, batch_loader, seq_len, use_cuda, train_word_sample, train_chars_sample, train_target):
 
         sample2_word_tensor = train_word_sample
         sample2_character_tensor = train_chars_sample
@@ -295,4 +295,4 @@ class RVAE(nn.Module):
         if use_cuda:
             seed = seed.cuda()
 
-        return self.sample(batch_loader, seq_len, seed, use_cuda, sample2_word_tensor)
+        return self.sample(batch_loader, seq_len, seed, use_cuda, sample2_word_tensor, False, train_target)

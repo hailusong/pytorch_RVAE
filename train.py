@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     for iteration in range(start_iteration, args.num_iterations):
 
-        cross_entropy, kld, coef, train_word_sample, train_chars_sample = train_step(iteration, args.batch_size, args.use_cuda, args.dropout)
+        cross_entropy, kld, coef, train_word_sample, train_chars_sample, train_target = train_step(iteration, args.batch_size, args.use_cuda, args.dropout)
 
         if iteration % 5 == 0:
             print('\n')
@@ -114,7 +114,7 @@ if __name__ == "__main__":
             sample, sample_ce, _ = rvae.sample(batch_loader, 50, seed, args.use_cuda)
             sample2, sample2_ce, sample2_len = rvae.sample2(batch_loader, 50, args.use_cuda, 'please play the jazz music')
             sample3, sample3_ce, sample3_len = rvae.sample2(batch_loader, 50, args.use_cuda, 'i really want to hear some jazz can you play some')
-            sample4, sample4_ce, sample4_len = rvae.sample3(batch_loader, 50, args.use_cuda, train_word_sample, train_chars_sample)
+            sample4, sample4_ce, sample4_len = rvae.sample3(batch_loader, 50, args.use_cuda, train_word_sample, train_chars_sample, train_target)
 
             print('\n')
             print('------------SAMPLE------------')
