@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     for iteration in range(start_iteration, args.num_iterations):
 
-        cross_entropy, kld, coef, train_word_sample, train_chars_sample, train_target = train_step(iteration, args.batch_size, args.use_cuda, args.dropout)
+        cross_entropy, kld, coef, unk_count, non_unk_count, train_word_sample, train_chars_sample, train_target = train_step(iteration, args.batch_size, args.use_cuda, args.dropout)
 
         if iteration % 5 == 0:
             print('\n')
@@ -84,10 +84,12 @@ if __name__ == "__main__":
             print(kld.data.cpu().numpy()[0])
             print('-----------KLD-coef-----------')
             print(coef)
+            print('-------UNK/NON-UNK COUNT------')
+            print(unk_count, non_unk_count)
             print('------------------------------')
 
         if iteration % 10 == 0:
-            cross_entropy, kld = validate(args.batch_size, args.use_cuda)
+            cross_entropy, kld, unk_count, non_unk_count = validate(args.batch_size, args.use_cuda)
 
             cross_entropy = cross_entropy.data.cpu().numpy()[0]
             kld = kld.data.cpu().numpy()[0]
@@ -98,6 +100,8 @@ if __name__ == "__main__":
             print(cross_entropy)
             print('-------------KLD--------------')
             print(kld)
+            print('-------UNK/NON-UNK COUNT------')
+            print(unk_count, non_unk_count)
             print('------------------------------')
 
             ce_result += [cross_entropy]

@@ -107,6 +107,11 @@ class RVAE(nn.Module):
             logits = logits.view(-1, self.params.word_vocab_size)
             target = target.view(-1)
 
+            # count unk in the output words
+            argmax_list = np.argmax(logits.data.numpy(), 1)
+            unk_count = [x for x in argmax_list if x == 43]
+            non_unk_count = [x for x in argmax_list if x != 43]
+
             # # ------------
             # inspect_word_idx = target[5].data.numpy()[0]
             # target_len = target.size()[0]
@@ -137,7 +142,7 @@ class RVAE(nn.Module):
             loss.backward()
             optimizer.step()
 
-            return cross_entropy, kld, kld_coef(i), encoder_word_input[:1], encoder_character_input[:1], target_original[:1]
+            return cross_entropy, kld, kld_coef(i), len(unk_count), len(non_unk_count), encoder_word_input[:1], encoder_character_input[:1], target_original[:1]
 
         return train
 
@@ -156,11 +161,17 @@ class RVAE(nn.Module):
                                   z=None)
 
             logits = logits.view(-1, self.params.word_vocab_size)
+
+            # count unk in the output words
+            argmax_list = np.argmax(logits.data.numpy(), 1)
+            unk_count = [x for x in argmax_list if x == 43]
+            non_unk_count = [x for x in argmax_list if x != 43]
+
             target = target.view(-1)
 
             cross_entropy = F.cross_entropy(logits, target)
 
-            return cross_entropy, kld
+            return cross_entropy, kld, len(unk_count), len(non_unk_count)
 
         return validate
 
@@ -198,7 +209,7 @@ class RVAE(nn.Module):
             prediction = F.softmax(logits)
 
             if use_max:
-                word = batch_loader.sample_word(prediction.data.cpu().numpy()[-1])
+                word = batch_loader.sample_word(prediction.data.cpu().numpy()[0])
             else:
                 word = batch_loader.sample_word_from_distribution(prediction.data.cpu().numpy()[-1])
 
@@ -292,4 +303,4 @@ class RVAE(nn.Module):
         if use_cuda:
             seed = seed.cuda()
 
-        return self.sample(batch_loader, seq_len, seed, use_cuda, sample2_word_tensor, False, train_target)
+        return self.sample(batch_loader, seq_len, seed, use_cuda, sample2_word_tensor, True, train_target)

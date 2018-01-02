@@ -6,6 +6,7 @@ import numpy as np
 from six.moves import cPickle
 
 from .functional import *
+import matplotlib.pyplot as plt
 
 
 class BatchLoader:
@@ -315,15 +316,21 @@ class BatchLoader:
 
         x = np.zeros((self.words_vocab_size, 1))
         x[ix] = 1
+        assert ix == np.argmax(x)
+
         return self.idx_to_word[np.argmax(x)]
 
     def sample_word(self, distribution):
-        ix = np.argmax(distribution.ravel())
-        # print("Select MAX PROBABILITY", ix)
+        ix = np.argmax(distribution)
+        # if ix == 43:
+        #     f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+        #     f.suptitle('softmax vs target: softmax on 5th word ' + str(ix))
+        #
+        #     ax1.plot(distribution)
+        #     ax1.set_title('softmax')
+        #     plt.show()
 
-        x = np.zeros((self.words_vocab_size, 1))
-        x[ix] = 1
-        return self.idx_to_word[np.argmax(x)]
+        return self.decode_word(ix)
 
     def encode_characters(self, characters):
         word_len = len(characters)
