@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     for iteration in range(start_iteration, args.num_iterations):
 
-        cross_entropy, kld, coef, unk_count, non_unk_count, train_word_sample, train_chars_sample, train_target = train_step(iteration, args.batch_size, args.use_cuda, args.dropout)
+        cross_entropy, kld, coef, unk_count, non_unk_count, train_output_words, train_word_sample, train_chars_sample, train_target = train_step(iteration, args.batch_size, args.use_cuda, args.dropout)
 
         if iteration % 5 == 0:
             print('\n')
@@ -131,7 +131,9 @@ if __name__ == "__main__":
             print(train_data_sample_original)
             print('>>>> INPUT PROCESSED')
             print(train_data_sample_sentence)
-            print('>>>> OUTPUT')
+            print('>>>> TRAIN OUTPUT')
+            print(train_output_words)
+            print('>>>> SAMPLE OUTPUT')
             print(sample4, '-', sample4_ce, ',', sample4_len)
             print('-------UNK/NON-UNK COUNT------')
             print(unk_count, non_unk_count)

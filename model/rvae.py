@@ -109,6 +109,14 @@ class RVAE(nn.Module):
 
             # count unk in the output words
             argmax_list = np.argmax(logits.data.numpy(), 1)
+
+            # end_token_idx = batch_loader.word_to_idx[batch_loader.end_token]
+            # if end_token_idx in argmax_list:
+            #     first_end_token_pos = int(np.where(argmax_list == end_token_idx)[0][0])
+            #     train_output_words = batch_loader.decode_words(argmax_list[:first_end_token_pos])
+            # else:
+            train_output_words = batch_loader.decode_words(argmax_list)
+
             unk_count = [x for x in argmax_list if x == 43]
             non_unk_count = [x for x in argmax_list if x != 43]
 
@@ -142,7 +150,7 @@ class RVAE(nn.Module):
             loss.backward()
             optimizer.step()
 
-            return cross_entropy, kld, kld_coef(i), len(unk_count), len(non_unk_count), encoder_word_input[:1], encoder_character_input[:1], target_original[:1]
+            return cross_entropy, kld, kld_coef(i), len(unk_count), len(non_unk_count), train_output_words, encoder_word_input[:1], encoder_character_input[:1], target_original[:1]
 
         return train
 
