@@ -106,8 +106,31 @@ class RVAE(nn.Module):
 
             logits = logits.view(-1, self.params.word_vocab_size)
             target = target.view(-1)
-            cross_entropy = F.cross_entropy(logits, target)
 
+            # # ------------
+            # inspect_word_idx = target[5].data.numpy()[0]
+            # target_len = target.size()[0]
+            # logits_target_distributions = logits.clone()
+            # target_distributions = np.zeros((target_len, self.params.word_vocab_size))
+            # for i in range(target_len):
+            #     target_distributions[i, target[i].data.numpy()[0]] = 1.0
+            # np.reshape(target_distributions, (-1))
+            #
+            # # softmax distribution for 5th word in the full list
+            # fifth = t.nn.functional.softmax(logits_target_distributions).data.numpy()[5]
+            #
+            # # plot
+            # f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+            # f.suptitle('softmax vs target: softmax on 5th word ' + str(np.sum(fifth)) + ', ' + batch_loader.decode_word(inspect_word_idx))
+            #
+            # ax1.plot(fifth)
+            # ax1.set_title('softmax')
+            # ax2.plot(target_distributions[5])
+            # ax2.set_title('target')
+            # plt.show()
+            # # ------------
+
+            cross_entropy = F.cross_entropy(logits, target)
             loss = 79 * cross_entropy + kld_coef(i) * kld
 
             optimizer.zero_grad()
@@ -199,7 +222,7 @@ class RVAE(nn.Module):
                 decoder_word_input, decoder_character_input = decoder_word_input.cuda(), decoder_character_input.cuda()
 
         if train_target is not None:
-            print("***********", seq_len, total_iteration_steps, logits_all.size(), train_target.size())
+            # print("***********", seq_len, total_iteration_steps, logits_all.size(), train_target.size())
             cross_entropy = F.cross_entropy(logits_all, train_target[0])
             cross_entropy = cross_entropy.data.numpy()[0]
 
@@ -237,23 +260,10 @@ class RVAE(nn.Module):
 
         z = Variable(t.randn([1, self.params.latent_variable_size]))
 
-        # f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
-        # f.suptitle('seed vs z')
-        #
-        # count, bins, _ = plt.hist(z.data.numpy().squeeze(), 30)
-        # ax1.plot(bins)
-        # ax1.set_title('z')
-
         if use_cuda:
             z = z.cuda()
 
         seed = z * std + mu
-
-        # count, bins, _ = plt.hist(seed.data.numpy().squeeze(), 30)
-        # ax2.plot(bins)
-        # ax2.set_title('seed')
-        #
-        # plt.show()
 
         if use_cuda:
             seed = seed.cuda()
@@ -274,23 +284,10 @@ class RVAE(nn.Module):
 
         z = Variable(t.randn([1, self.params.latent_variable_size]))
 
-        # f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
-        # f.suptitle('seed vs z')
-        #
-        # count, bins, _ = plt.hist(z.data.numpy().squeeze(), 30)
-        # ax1.plot(bins)
-        # ax1.set_title('z')
-
         if use_cuda:
             z = z.cuda()
 
         seed = z * std + mu
-
-        # count, bins, _ = plt.hist(seed.data.numpy().squeeze(), 30)
-        # ax2.plot(bins)
-        # ax2.set_title('seed')
-        #
-        # plt.show()
 
         if use_cuda:
             seed = seed.cuda()
