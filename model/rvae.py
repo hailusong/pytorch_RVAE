@@ -195,6 +195,8 @@ class RVAE(nn.Module):
         logits_all = None
         cross_entropy = 0
         effective_len = 0
+        unk_count = 0
+        non_unk_count = 0
         found_end = False
         total_iteration_steps = seq_len if train_target is None else train_target.size()[1]
 
@@ -237,7 +239,12 @@ class RVAE(nn.Module):
             cross_entropy = F.cross_entropy(logits_all, train_target[0])
             cross_entropy = cross_entropy.data.numpy()[0]
 
-        return result, cross_entropy, effective_len
+            # count unk in the output words
+            argmax_list = np.argmax(logits_all.data.numpy(), 1)[:effective_len]
+            unk_count = len([x for x in argmax_list if x == 43])
+            non_unk_count = len([x for x in argmax_list if x != 43])
+
+        return result, cross_entropy, effective_len, unk_count, non_unk_count
 
     def sample2(self, batch_loader, seq_len, use_cuda, source_sentence):
 
