@@ -104,11 +104,11 @@ class RVAE(nn.Module):
                                   decoder_word_input, decoder_character_input,
                                   z=None)
 
+            # count unk in the output words
+            argmax_list = np.argmax(logits[0].data.numpy(), 1)
+
             logits = logits.view(-1, self.params.word_vocab_size)
             target = target.view(-1)
-
-            # count unk in the output words
-            argmax_list = np.argmax(logits.data.numpy(), 1)
 
             # end_token_idx = batch_loader.word_to_idx[batch_loader.end_token]
             # if end_token_idx in argmax_list:
